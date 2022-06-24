@@ -1,0 +1,129 @@
+#!/usr/bin/env ansible-playbook
+#
+--- 
+- name: Configuration
+  hosts: 
+    - 'staging'
+    - 'production'
+  become: true
+
+  tasks:
+  - name: Run APT Update & Install NodeJS and NPM
+    ansible.builtin.apt:
+     name: 
+     -  nodejs
+     -  npm
+     state: latest
+     update_cache: yes
+
+  - name: Create a directory if it does not exist
+    ansible.builtin.file:
+     path: /home/project
+     state: directory
+     mode: '0755'
+
+  - name: Git checkout
+    ansible.builtin.git:
+     repo: 'https://github.com/BenTest12/bootcamp-app.git'
+     dest: /home/project/bootcamp-app/
+     update: no
+
+  - name: Recursively change ownership of a directory
+    ansible.builtin.file:
+      path: /home/project/bootcamp-app/
+      state: directory
+      recurse: yes
+      owner: ubuntu
+      group: ubuntu
+
+  - name: Install node.js package.json packages.
+    shell: npm install && npm audit fix --force
+    args:
+      chdir: "/home/project/bootcamp-app/"
+  
+  - name: Install n node.js package globally.
+    npm:
+      name: n
+      global: yes
+  
+  - name: Run n 14.15.3
+    shell: n 14.15.3
+    args:
+      executable: /bin/bash
+
+  - name: Run hash -r to switch node version
+    shell: hash -r
+    args:
+      executable: /bin/bash
+
+  - name: Copy STAGING env file
+    when: "'production' not in group_names"
+    with_items: 
+      - staging
+    copy:
+      src: /home/ubuntu/project/ansible/playbooks/staging/.env
+      dest: /home/project/bootcamp-app/
+      owner: ubuntu
+      group: ubuntu
+      mode: '0644'
+
+  - name: Copy PRODUCTION env file
+    when: "'staging' not in group_names"
+    with_items: 
+      - production
+    copy:
+      src: /home/ubuntu/project/ansible/playbooks/production/.env
+      dest: /home/project/bootcamp-app/
+      owner: ubuntu
+      group: ubuntu
+      mode: '0644'
+
+  - name: Run initDB once on STAGING DB.
+    shell:  cd /home/project/bootcamp-app/ && npm run initdb     
+    become: true
+    run_once: true
+    delegate_to: dev2
+
+  - name: Run initDB once on PRODUCTION DB.
+    shell:  cd /home/project/bootcamp-app/ && npm run initdb     
+    become: true
+    run_once: true
+    delegate_to: prod2
+  - name: Install pm2 node.js package globally.
+    npm:
+      name: pm2
+      global: yes
+
+  - name: Remove old pm2 instances if exists
+    shell: pm2 delete all --force 
+    args:
+      executable: /bin/bash
+    ignore_errors: true
+
+  - name: Run pm2 startup
+    shell: pm2 startup
+    args:
+      executable: /bin/bash
+
+  - name: Run pm2 settings
+    become: true
+    shell: env PATH=$PATH:/usr/local/bin /usr/local/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu
+    args:
+      executable: /bin/bash
+
+  - name: Run application
+    shell: pm2 start npm -- run dev && pm2 save && pm2 startup
+    args:
+      chdir: "/home/project/bootcamp-app/"
+    ignore_errors: true
+
+  - name: Run pm2 save
+    become_user: ubuntu
+    shell: pm2 save 
+    args:
+      executable: /bin/bash
+    ignore_errors: true
+  
+  - name: Reboot host
+    become: true
+    reboot:

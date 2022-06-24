@@ -1,0 +1,130 @@
+---
+#POC Bonus playbook
+#Runs on all windows hosts specified in a custom inventory file
+#Installs all dependencies for the bootcamp app , clones it and runs it.
+ 
+- name: Provision Windows Machine
+  hosts: all 
+
+  tasks:
+
+    #Create Directory for ansible installs
+  - name: Create ansible installs folder
+    win_file:
+      path: C:\ansible_installs
+      state: directory
+
+    #Download NodeJS V14.15.3 (Includes NPM)
+  - name: Download NodeJS 14.15.3 (Includes NPM) installer
+    win_get_url:
+      url: https://nodejs.org/dist/v14.15.3/node-v14.15.3-x64.msi
+      dest: C:\ansible_installs\node-v14.15.3-x64.msi
+ 
+
+    #Install the MSI file downloaded
+  - name: Install MSI
+    win_package: 
+      path: C:\ansible_installs\node-v14.15.3-x64.msi
+      state: present
+  
+
+    #Install Git 
+  - name: Install Git
+    win_package:
+      path: https://github.com/git-for-windows/git/releases/download/v2.36.1.windows.1/Git-2.36.1-64-bit.exe
+      product_id: '{CF2BEA3C-26EA-32F8-AA9B-331F7E34BA97}'
+      arguments: /VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /COMPONENTS="icons,ext\reg\shellhere,assoc,assoc_sh"
+
+
+    #Ensure Git vars are enabled in the system path enviornment variable
+  - name: Ensure git vars are setup in windows
+    win_path:
+      elements:
+      - 'C:\Program Files\Git\bin\'
+      - 'C:\Program Files\Git\cmd\'
+
+    
+    #Reboot the windows machine to ensure vars are applied (logout\login in production)
+  - name: Reboot the machine with all defaults
+    win_reboot:
+
+
+    #Clone the bootcamp app locally from the forked repository
+  - name: Clone the bootcamp app
+    win_shell: |
+        cd C:\
+        git clone https://github.com/BenTest12/bootcamp-app.git
+
+
+    #Copy Pre-configured .env file
+  - name: Copy .env file
+    win_copy:
+      src: /home/ubuntu/project/bootcamp-app/.env
+      dest: C:\bootcamp-app\.env
+
+
+    #Install bootcamp app weight app npm dependencies
+  - name: Run npm install for dependencies
+    win_shell: npm install 
+    args:
+      chdir: C:\bootcamp-app
+   
+
+    #Force install leftover packages
+  - name: Run npm install audit fix for dependencies
+    win_shell: npm audit fix --force
+    args:
+      chdir: C:\bootcamp-app
+
+
+    #Install PM2 node.js package globally for failover options
+  - name: Install pm2 node.js package globally.
+    win_shell: npm install pm2 -g
+    args:
+      chdir: C:\bootcamp-app
+  
+
+    #Configure the weight app 
+  - name: Configure the weight app 
+    win_shell: pm2 start src/index.js
+    args:
+      chdir: C:\bootcamp-app
+    async: 3
+    poll: 0
+
+
+    #Install pm2 windows workaround
+  - name: Install pm2 windows workaround
+    win_shell: npm install pm2-windows-startup -g
+    args:
+      chdir: C:\bootcamp-app
+    async: 3
+    poll: 0
+
+
+    #Configure pm2 windows workaround
+  - name: Configure pm2 windows workaround
+    win_shell: pm2-startup install
+    args:
+      chdir: C:\bootcamp-app
+    async: 3
+    poll: 0
+
+
+    #Save project settings in pm2
+  - name: Save project settings in pm2
+    win_shell: pm2 save
+    args:
+      chdir: C:\bootcamp-app
+    async: 3
+    poll: 0
+
+
+    #Run initDB 
+  - name: Run initDB
+    win_shell: node tools/initdb.js
+    args:
+      chdir: C:\bootcamp-app
+    async: 3
+    poll: 0
+
