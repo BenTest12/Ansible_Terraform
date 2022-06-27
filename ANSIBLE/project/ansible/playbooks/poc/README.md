@@ -1,4 +1,4 @@
-![alt text](winarm.png)
+![alt text](https://cdn.comparitech.com/wp-content/uploads/2021/03/WinRM-Guide.jpg)
 
 - Ansible uses Protocol WinARM , with which we can make configuration on Windows VM.
 - To activate WinArm use this command:
