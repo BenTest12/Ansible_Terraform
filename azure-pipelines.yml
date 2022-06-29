@@ -1,0 +1,21 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: ansible
+
+steps:
+
+- task: UniversalPackages@0
+  inputs:
+    command: 'download'
+    downloadDirectory: '$(System.DefaultWorkingDirectory)'
+    feedsToUse: 'internal'
+    vstsFeed: '680ed216-9463-467e-90b3-b1757cdb7c2c'
+    vstsFeedPackage: '0d773148-70e5-4366-bdaf-be0c40e5356a'
+    vstsPackageVersion: '0.0.2'
